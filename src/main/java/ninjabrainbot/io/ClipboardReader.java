@@ -4,12 +4,16 @@ import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import ninjabrainbot.event.IObservable;
 import ninjabrainbot.event.ObservableField;
 import ninjabrainbot.io.preferences.NinjabrainBotPreferences;
+import ninjabrainbot.util.Logger;
 
 public class ClipboardReader implements IClipboardProvider, Runnable {
 
@@ -40,6 +44,32 @@ public class ClipboardReader implements IClipboardProvider, Runnable {
 
 	@Override
 	public void run() {
+		String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
+		if (waylandDisplay != null && !waylandDisplay.isEmpty()) {
+			try {
+				String[] command = { "wl-paste", "--watch", "sh", "-c", "cat; echo" };
+				Process wlPaste = Runtime.getRuntime().exec(command);
+				Runtime.getRuntime().addShutdownHook(new Thread(() -> wlPaste.destroy()));
+				Logger.log("Reading the clipboard through wl-paste.");
+
+				BufferedReader reader = new BufferedReader(new InputStreamReader(wlPaste.getInputStream(), StandardCharsets.UTF_8));
+				String line = reader.readLine();
+				while (line != null) {
+					if (line.length() > 1000)
+						line = line.substring(0, 1000);
+					if (!line.isEmpty() && !lastClipboardString.equals(line)) {
+						onClipboardUpdated(line);
+						lastClipboardString = line;
+					}
+					line = reader.readLine();
+				}
+				reader.close();
+				Logger.log("wl-paste stopped, falling back to polling the clipboard.");
+			} catch (IOException e) {
+				Logger.log("Could not read the clipboard through wl-paste, falling back to polling the clipboard.");
+			}
+		}
+
 		while (true) {
 			boolean read = !preferences.altClipboardReader.get();
 			if (preferences.altClipboardReader.get() && forceReadLater.get()) {

@@ -48,6 +48,7 @@
           libxinerama,
           libxt,
           libxtst,
+          wl-clipboard,
         }:
         let
           linuxNativeLibraries = [
@@ -100,6 +101,7 @@
             ${lib.optionalString stdenv.hostPlatform.isLinux ''
               makeWrapperArgs+=(
                 --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath linuxNativeLibraries}
+                --prefix PATH : ${lib.makeBinPath [ wl-clipboard ]}
               )
             ''}
 
