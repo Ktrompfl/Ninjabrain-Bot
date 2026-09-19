@@ -13,6 +13,8 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import ninjabrainbot.event.IDisposable;
+import ninjabrainbot.io.preferences.HotkeyPreference;
+import ninjabrainbot.io.preferences.NinjabrainBotPreferences;
 import ninjabrainbot.io.api.queries.AllAdvancementsQuery;
 import ninjabrainbot.io.api.queries.BlindQuery;
 import ninjabrainbot.io.api.queries.BoatQuery;
@@ -32,8 +34,9 @@ public class ApiV1HttpHandler implements HttpHandler, IDisposable {
 
 	private final EventSender eventSender;
 	private final HashMap<String, IQuery> queries;
+	private final HashMap<String, HotkeyPreference> actions;
 
-	public ApiV1HttpHandler(IDataState dataState, IDomainModel domainModel, InformationMessageList informationMessageList, ExecutorService executorService) {
+	public ApiV1HttpHandler(IDataState dataState, IDomainModel domainModel, InformationMessageList informationMessageList, NinjabrainBotPreferences preferences, ExecutorService executorService) {
 		eventSender = new EventSender(domainModel, executorService);
 		queries = new HashMap<>();
 		queries.put("stronghold", new StrongholdQuery(dataState));
@@ -44,6 +47,19 @@ public class ApiV1HttpHandler implements HttpHandler, IDisposable {
 		queries.put("information-messages", new InformationMessagesQuery(informationMessageList));
 		queries.put("version", new VersionQuery());
 		queries.put("ping", new PingQuery());
+
+		actions = new HashMap<>();
+		actions.put("reset", preferences.hotkeyReset);
+		actions.put("undo", preferences.hotkeyUndo);
+		actions.put("redo", preferences.hotkeyRedo);
+		actions.put("increment", preferences.hotkeyIncrement);
+		actions.put("decrement", preferences.hotkeyDecrement);
+		actions.put("alt-std", preferences.hotkeyAltStd);
+		actions.put("boat", preferences.hotkeyBoat);
+		actions.put("mod-360", preferences.hotkeyMod360);
+		actions.put("lock", preferences.hotkeyLock);
+		actions.put("minimize", preferences.hotkeyMinimize);
+		actions.put("all-advancements-mode", preferences.hotkeyToggleAllAdvancementsMode);
 	}
 
 	@Override
@@ -53,6 +69,18 @@ public class ApiV1HttpHandler implements HttpHandler, IDisposable {
 
 		if (subdirectories.size() == 0) {
 			sendBadRequest(exchange);
+			return;
+		}
+
+		if (subdirectories.size() == 2 && subdirectories.get(0).contentEquals("action")) {
+			HotkeyPreference action = actions.getOrDefault(subdirectories.get(1), null);
+			if (action == null) {
+				sendBadRequest(exchange);
+				return;
+			}
+			action.execute();
+			exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
+			exchange.getResponseBody().close();
 			return;
 		}
 

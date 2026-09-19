@@ -58,7 +58,7 @@ public class NinjabrainBotHttpServer implements IDisposable {
 		}
 		if (executorService == null)
 			executorService = Executors.newFixedThreadPool(1);
-		apiV1HttpHandler = new ApiV1HttpHandler(dataState, domainModel, informationMessageList, executorService);
+		apiV1HttpHandler = new ApiV1HttpHandler(dataState, domainModel, informationMessageList, preferences, executorService);
 		httpServer.createContext("/api/v1", apiV1HttpHandler);
 		httpServer.setExecutor(executorService);
 		httpServer.start();
